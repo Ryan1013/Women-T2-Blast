@@ -1,12 +1,16 @@
 import streamlit as st
 import pandas as pd
 
-# Load base table from the original CSV data
+# ----------------------------------------
+# Cached Data Loader
+# ----------------------------------------
 @st.cache_data
 def load_base_data():
     return pd.read_csv("9JuneuptoWT20.csv")
 
-# Helper functions
+# ----------------------------------------
+# Helper Functions
+# ----------------------------------------
 def cricket_overs_to_balls(overs):
     overs_int = int(overs)
     balls_part = int(round((overs - overs_int) * 10))
@@ -17,7 +21,26 @@ def balls_to_cricket_overs(balls):
     rem_balls = balls % 6
     return float(f"{int(overs)}.{int(rem_balls)}")
 
-# Team list
+def corrected_actual_overs(row):
+    adjusted_ball = row['Actual Ball']
+    if row['Legal Ball'] != 'Yes':
+        adjusted_ball = max(0, adjusted_ball - 1)
+    if adjusted_ball == 6:
+        return float(f"{int(row['Over'])}.0")
+    else:
+        return float(f"{int(row['Over']) - 1}.{int(adjusted_ball)}")
+
+def is_valid_overs(o):
+    int_part = int(o)
+    dec_part = round((o - int_part) * 10)
+    return 0 <= dec_part <= 5
+
+# ----------------------------------------
+# Setup
+# ----------------------------------------
+st.title("Vitality Blast 2025 Standings Calculator")
+st.markdown("Input results for **future games** below to get the updated standings.")
+
 team_list = [
     'Middlesex Women', 'Yorkshire Women', 'Northamptonshire Steelbacks Women',
     'Derbyshire Falcons Women', 'Glamorgan Women', 'Sussex Sharks Women',
@@ -31,28 +54,22 @@ north_group = [
     'Worcestershire Rapids Women'
 ]
 
-# UI
-st.title("Vitality Blast 2025 Standings Calculator")
-st.markdown("Input results for **future games** below to get the updated standings.")
-
+# ----------------------------------------
+# Input Future Matches
+# ----------------------------------------
 num_matches = st.number_input("Number of future matches to add", min_value=1, value=1, step=1)
-
 future_matches = []
-overs_input_valid = True  # Global validation flag
+overs_input_valid = True
 
 for i in range(num_matches):
     st.markdown(f"### Match {i+1}")
     team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
     team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
     runs_for = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs_for_{i}")
-    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}",
-                                min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
+    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
     runs_against = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs_against_{i}")
-    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}",
-                                    min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
+    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
 
-    # Validation: only accept overs ending in .0 to .5
-    def is_valid_overs(o): return (o * 10) % 1 == 0 and 0.0 <= (o % 1) <= 0.5
     if not is_valid_overs(overs_for):
         st.warning(f"⚠️ Match {i+1}: Overs For must end in .0 to .5 only.")
         overs_input_valid = False
@@ -66,6 +83,9 @@ for i in range(num_matches):
         'runs_against': runs_against, 'overs_against': overs_against
     })
 
+# ----------------------------------------
+# Process and Calculate
+# ----------------------------------------
 if st.button("Update Table"):
     if not overs_input_valid:
         st.error("❌ Please correct the invalid Overs inputs before proceeding.")
@@ -80,11 +100,7 @@ if st.button("Update Table"):
     rows = df[mask].copy().reset_index(drop=True).drop(columns=['Next_Innings'])
 
     rows['Actual Ball'] = rows['Ball']
-    rows['Actual Overs'] = rows.apply(
-        lambda row: float(f"{int(row['Over']) - 1}.{int(row['Actual Ball'])}") if row['Legal Ball'] != 'Yes'
-        else float(f"{int(row['Over'])}.{int(row['Actual Ball'])}") if row['Actual Ball'] == 6
-        else float(f"{int(row['Over']) - 1}.{int(row['Actual Ball'])}"), axis=1)
-
+    rows['Actual Overs'] = rows.apply(corrected_actual_overs, axis=1)
     rows['NRR Overs'] = rows.apply(lambda r: 20.0 if r['Team Wickets'] == 10 else r['Actual Overs'], axis=1)
     rows['NRR Balls'] = rows['NRR Overs'].apply(cricket_overs_to_balls)
 
@@ -106,15 +122,16 @@ if st.button("Update Table"):
 
     summary = pd.merge(for_summary, against_summary, on='Team', how='outer')
 
+    # Add future matches
     add_rows = []
     future_results = []
-
     for match in future_matches:
         t1, t2 = match['team1'], match['team2']
         rf, of, ra, oa = match['runs_for'], match['overs_for'], match['runs_against'], match['overs_against']
-        add_rows.append({'Team': t1, 'Runs For': rf, 'Overs For': of, 'Runs Against': ra, 'Overs Against': oa})
-        add_rows.append({'Team': t2, 'Runs For': ra, 'Overs For': oa, 'Runs Against': rf, 'Overs Against': of})
-
+        add_rows += [
+            {'Team': t1, 'Runs For': rf, 'Overs For': of, 'Runs Against': ra, 'Overs Against': oa},
+            {'Team': t2, 'Runs For': ra, 'Overs For': oa, 'Runs Against': rf, 'Overs Against': of}
+        ]
         if rf > ra:
             future_results += [{'Team': t1, 'W': 1, 'L': 0, 'T': 0, 'N/R': 0}, {'Team': t2, 'W': 0, 'L': 1, 'T': 0, 'N/R': 0}]
         elif rf < ra:
@@ -124,8 +141,7 @@ if st.button("Update Table"):
 
     add_df = pd.DataFrame(add_rows)
     summary = pd.concat([summary, add_df]).groupby('Team').agg({
-        'Runs For': 'sum', 'Overs For': 'sum',
-        'Runs Against': 'sum', 'Overs Against': 'sum'
+        'Runs For': 'sum', 'Overs For': 'sum', 'Runs Against': 'sum', 'Overs Against': 'sum'
     }).reset_index()
 
     summary['NRR Balls For'] = summary['Overs For'].apply(cricket_overs_to_balls)
