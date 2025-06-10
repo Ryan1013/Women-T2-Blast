@@ -33,14 +33,26 @@ north_group = [
 
 # UI
 st.title("Vitality Blast 2025 Standings Calculator")
-st.markdown("Input results for a **future game** below to get the updated standings.")
+st.markdown("Input results for **future games** below to get the updated standings.")
 
-team1 = st.selectbox("Team 1 (For)", team_list)
-team2 = st.selectbox("Team 2 (Against)", [t for t in team_list if t != team1])
-runs_for = st.number_input("Runs For", min_value=0)
-overs_for = st.number_input("Overs For (e.g., 19.5)", min_value=0.0, step=0.1)
-runs_against = st.number_input("Runs Against", min_value=0)
-overs_against = st.number_input("Overs Against (e.g., 20.0)", min_value=0.0, step=0.1)
+num_matches = st.number_input("Number of future matches to add", min_value=1, value=1, step=1)
+
+future_matches = []
+
+for i in range(num_matches):
+    st.markdown(f"### Match {i+1}")
+    team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
+    team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
+    runs_for = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs_for_{i}")
+    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, step=0.1, key=f"overs_for_{i}")
+    runs_against = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs_against_{i}")
+    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, key=f"overs_against_{i}")
+
+    future_matches.append({
+        'team1': team1, 'team2': team2,
+        'runs_for': runs_for, 'overs_for': overs_for,
+        'runs_against': runs_against, 'overs_against': overs_against
+    })
 
 if st.button("Update Table"):
     df = load_base_data()
@@ -78,14 +90,24 @@ if st.button("Update Table"):
 
     summary = pd.merge(for_summary, against_summary, on='Team', how='outer')
 
-    # Add future match
-    add_df = pd.DataFrame({
-        'Team': [team1, team2],
-        'Runs For': [runs_for, runs_against],
-        'Overs For': [overs_for, overs_against],
-        'Runs Against': [runs_against, runs_for],
-        'Overs Against': [overs_against, overs_for]
-    })
+    # Add all future matches
+    add_rows = []
+    future_results = []
+
+    for match in future_matches:
+        t1, t2 = match['team1'], match['team2']
+        rf, of, ra, oa = match['runs_for'], match['overs_for'], match['runs_against'], match['overs_against']
+        add_rows.append({'Team': t1, 'Runs For': rf, 'Overs For': of, 'Runs Against': ra, 'Overs Against': oa})
+        add_rows.append({'Team': t2, 'Runs For': ra, 'Overs For': oa, 'Runs Against': rf, 'Overs Against': of})
+
+        if rf > ra:
+            future_results += [{'Team': t1, 'W': 1, 'L': 0, 'T': 0, 'N/R': 0}, {'Team': t2, 'W': 0, 'L': 1, 'T': 0, 'N/R': 0}]
+        elif rf < ra:
+            future_results += [{'Team': t1, 'W': 0, 'L': 1, 'T': 0, 'N/R': 0}, {'Team': t2, 'W': 1, 'L': 0, 'T': 0, 'N/R': 0}]
+        else:
+            future_results += [{'Team': t1, 'W': 0, 'L': 0, 'T': 1, 'N/R': 0}, {'Team': t2, 'W': 0, 'L': 0, 'T': 1, 'N/R': 0}]
+
+    add_df = pd.DataFrame(add_rows)
     summary = pd.concat([summary, add_df]).groupby('Team').agg({
         'Runs For': 'sum', 'Overs For': 'sum',
         'Runs Against': 'sum', 'Overs Against': 'sum'
@@ -115,17 +137,9 @@ if st.button("Update Table"):
             t1 = group.iloc[0]['Batting Team']
             t2 = group.iloc[0]['Bowling Team']
             match_results += [{'Team': t1, 'W': 0, 'L': 0, 'T': 0, 'N/R': 1}, {'Team': t2, 'W': 0, 'L': 0, 'T': 0, 'N/R': 1}]
-    match_df = pd.DataFrame(match_results)
-    outcome = match_df.groupby('Team').sum().reset_index()
 
-    # Add future match result
-    if runs_for > runs_against:
-        new_result = pd.DataFrame({'Team': [team1, team2], 'W': [1, 0], 'L': [0, 1], 'T': [0, 0], 'N/R': [0, 0]})
-    elif runs_for < runs_against:
-        new_result = pd.DataFrame({'Team': [team1, team2], 'W': [0, 1], 'L': [1, 0], 'T': [0, 0], 'N/R': [0, 0]})
-    else:
-        new_result = pd.DataFrame({'Team': [team1, team2], 'W': [0, 0], 'L': [0, 0], 'T': [1, 1], 'N/R': [0, 0]})
-    outcome = pd.concat([outcome, new_result]).groupby('Team').sum().reset_index()
+    match_df = pd.DataFrame(match_results + future_results)
+    outcome = match_df.groupby('Team').sum().reset_index()
     outcome['M'] = outcome[['W', 'L', 'T', 'N/R']].sum(axis=1)
     outcome['BP'] = outcome['Team'].map({
         'Middlesex Women': 1, 'Yorkshire Women': 2, 'Derbyshire Falcons Women': 1
@@ -137,7 +151,6 @@ if st.button("Update Table"):
     final = final.sort_values(by=['PT', 'NRR'], ascending=[False, False]).reset_index(drop=True)
     final.index += 1
 
-    # Split into North and South
     north_table = final[final['Team'].isin(north_group)].reset_index(drop=True)
     south_table = final[~final['Team'].isin(north_group)].reset_index(drop=True)
     north_table.index += 1
