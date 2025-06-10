@@ -1,9 +1,11 @@
+
 import streamlit as st
 import pandas as pd
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
+@st.cache_data
+def load_base_data():
+    return pd.read_csv("9JuneuptoWT20.csv")
+
 def cricket_overs_to_balls(overs):
     overs_int = int(overs)
     balls_part = int(round((overs - overs_int) * 10))
@@ -14,106 +16,105 @@ def balls_to_cricket_overs(balls):
     rem_balls = balls % 6
     return float(f"{int(overs)}.{int(rem_balls)}")
 
-# -----------------------------
-# Load Processed Base Table
-# -----------------------------
-@st.cache_data
-def load_base_table():
-    base = pd.read_csv("/mnt/data/9JuneuptoWT20.csv")
-    # ... Add preprocessing logic here, or assume final_display, north_table, south_table already computed
-    # For simplicity, return pre-split group tables
-    return north_table.copy(), south_table.copy()
+team_list = [
+    'Middlesex Women', 'Yorkshire Women', 'Northamptonshire Steelbacks Women',
+    'Derbyshire Falcons Women', 'Glamorgan Women', 'Sussex Sharks Women',
+    'Worcestershire Rapids Women', 'Leicestershire Foxes Women',
+    'Kent Women', 'Gloucestershire Women'
+]
 
-north_table, south_table = load_base_table()
-all_teams = sorted(north_table["Team"].tolist() + south_table["Team"].tolist())
+north_group = [
+    'Yorkshire Women', 'Northamptonshire Steelbacks Women',
+    'Derbyshire Falcons Women', 'Leicestershire Foxes Women',
+    'Worcestershire Rapids Women'
+]
 
-# -----------------------------
-# Streamlit Interface
-# -----------------------------
 st.title("Vitality Blast 2025 Standings Calculator")
+st.markdown("Input results for **future games** below to get the updated standings.")
 
-num_matches = st.number_input("Number of future matches to add", min_value=1, max_value=10, value=1, step=1)
+num_matches = st.number_input("Number of future matches to add", min_value=1, value=1, step=1)
 
-future_results = []
+future_matches = []
+overs_input_valid = True
+
 for i in range(num_matches):
-    st.subheader(f"Match {i+1}")
-    col1, col2 = st.columns(2)
-    with col1:
-        team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", all_teams, key=f"team1_{i}")
-        runs1 = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs1_{i}")
-        overs1 = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, max_value=20.0, step=0.1, key=f"overs1_{i}")
-    with col2:
-        team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", all_teams, key=f"team2_{i}")
-        runs2 = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs2_{i}")
-        overs2 = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, max_value=20.0, step=0.1, key=f"overs2_{i}")
+    st.markdown(f"### Match {i+1}")
+    team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
+    team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
+    runs_for = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs_for_{i}")
+    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
+    runs_against = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs_against_{i}")
+    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
 
-    future_results.append({
-        'team1': team1, 'runs1': runs1, 'overs1': overs1,
-        'team2': team2, 'runs2': runs2, 'overs2': overs2
+    def is_valid_overs(o): return (o * 10) % 1 == 0 and 0.0 <= (o % 1) <= 0.5
+    if not is_valid_overs(overs_for):
+        st.warning(f"⚠️ Match {i+1}: Overs For must end in .0 to .5 only.")
+        overs_input_valid = False
+    if not is_valid_overs(overs_against):
+        st.warning(f"⚠️ Match {i+1}: Overs Against must end in .0 to .5 only.")
+        overs_input_valid = False
+
+    future_matches.append({
+        'team1': team1, 'team2': team2,
+        'runs_for': runs_for, 'overs_for': overs_for,
+        'runs_against': runs_against, 'overs_against': overs_against
     })
 
 if st.button("Update Table"):
-    temp_table = pd.concat([north_table, south_table], ignore_index=True)
+    if not overs_input_valid:
+        st.error("❌ Please correct the invalid Overs inputs before proceeding.")
+        st.stop()
 
-    for match in future_results:
-        for_record = temp_table[temp_table["Team"] == match["team1"]].copy()
-        against_record = temp_table[temp_table["Team"] == match["team2"]].copy()
+    base = pd.read_csv("north_table.csv")
+    base_south = pd.read_csv("south_table.csv")
+    combined = pd.concat([base, base_south], ignore_index=True)
 
-        for_record["Runs For"] += match["runs1"]
-        for_record["Overs For"] += match["overs1"]
-        for_record["Runs Against"] += match["runs2"]
-        for_record["Overs Against"] += match["overs2"]
-        for_record["M"] += 1
+    new_rows = []
+    new_results = []
 
-        against_record["Runs For"] += match["runs2"]
-        against_record["Overs For"] += match["overs2"]
-        against_record["Runs Against"] += match["runs1"]
-        against_record["Overs Against"] += match["overs1"]
-        against_record["M"] += 1
-
-        # Update win/loss/tie
-        if match["runs1"] > match["runs2"]:
-            for_record["W"] += 1
-            for_record["PT"] += 4
-            against_record["L"] += 1
-        elif match["runs1"] < match["runs2"]:
-            for_record["L"] += 1
-            against_record["W"] += 1
-            against_record["PT"] += 4
+    for match in future_matches:
+        t1, t2 = match['team1'], match['team2']
+        rf, of, ra, oa = match['runs_for'], match['overs_for'], match['runs_against'], match['overs_against']
+        new_rows.append({'Team': t1, 'Runs For': rf, 'Overs For': of, 'Runs Against': ra, 'Overs Against': oa, 'M': 1})
+        new_rows.append({'Team': t2, 'Runs For': ra, 'Overs For': oa, 'Runs Against': rf, 'Overs Against': of, 'M': 1})
+        if rf > ra:
+            new_results += [{'Team': t1, 'W': 1, 'L': 0, 'T': 0, 'N/R': 0, 'PT': 4}, {'Team': t2, 'W': 0, 'L': 1, 'T': 0, 'N/R': 0, 'PT': 0}]
+        elif rf < ra:
+            new_results += [{'Team': t1, 'W': 0, 'L': 1, 'T': 0, 'N/R': 0, 'PT': 0}, {'Team': t2, 'W': 1, 'L': 0, 'T': 0, 'N/R': 0, 'PT': 4}]
         else:
-            for_record["T"] += 1
-            for_record["PT"] += 2
-            against_record["T"] += 1
-            against_record["PT"] += 2
+            new_results += [{'Team': t1, 'W': 0, 'L': 0, 'T': 1, 'N/R': 0, 'PT': 2}, {'Team': t2, 'W': 0, 'L': 0, 'T': 1, 'N/R': 0, 'PT': 2}]
 
-        # Update NRR
-        for_record["NRR"] = round(
-            (for_record["Runs For"] / (cricket_overs_to_balls(for_record["Overs For"]) / 6)) -
-            (for_record["Runs Against"] / (cricket_overs_to_balls(for_record["Overs Against"]) / 6)), 3)
-        against_record["NRR"] = round(
-            (against_record["Runs For"] / (cricket_overs_to_balls(against_record["Overs For"]) / 6)) -
-            (against_record["Runs Against"] / (cricket_overs_to_balls(against_record["Overs Against"]) / 6)), 3)
+    match_df = pd.DataFrame(new_rows)
+    result_df = pd.DataFrame(new_results)
 
-        temp_table.update(for_record)
-        temp_table.update(against_record)
+    updated = pd.concat([combined, match_df]).groupby('Team').agg({
+        'M': 'sum', 'W': 'sum', 'L': 'sum', 'T': 'sum', 'N/R': 'sum', 'BP': 'sum', 'PT': 'sum',
+        'Runs For': 'sum', 'Overs For': 'sum', 'Runs Against': 'sum', 'Overs Against': 'sum'
+    }).reset_index()
 
-    north_group = ['Yorkshire Women', 'Northamptonshire Steelbacks Women', 'Derbyshire Falcons Women',
-                   'Leicestershire Foxes Women', 'Worcestershire Rapids Women']
-    north_updated = temp_table[temp_table["Team"].isin(north_group)].copy()
-    south_updated = temp_table[~temp_table["Team"].isin(north_group)].copy()
+    updated = pd.merge(updated, result_df.groupby('Team').sum().reset_index(), on='Team', how='outer').fillna(0)
+    updated = updated.groupby('Team').sum(numeric_only=True).reset_index()
 
-    north_updated = north_updated.sort_values(by=["PT", "NRR"], ascending=[False, False]).reset_index(drop=True)
-    south_updated = south_updated.sort_values(by=["PT", "NRR"], ascending=[False, False]).reset_index(drop=True)
+    updated['PT'] += updated['W'] * 4 + updated['T'] * 2 + updated['N/R'] * 2 + updated['BP']
+    updated['NRR Balls For'] = updated['Overs For'].apply(cricket_overs_to_balls)
+    updated['NRR Balls Against'] = updated['Overs Against'].apply(cricket_overs_to_balls)
+    updated['Run Rate For'] = updated['Runs For'] / (updated['NRR Balls For'] / 6)
+    updated['Run Rate Against'] = updated['Runs Against'] / (updated['NRR Balls Against'] / 6)
+    updated['NRR'] = (updated['Run Rate For'] - updated['Run Rate Against']).round(3)
 
-    north_updated.index += 1
-    south_updated.index += 1
+    final = updated[['Team', 'M', 'W', 'L', 'T', 'N/R', 'BP', 'PT', 'NRR', 'Runs For', 'Overs For', 'Runs Against', 'Overs Against']]
+    final = final.sort_values(by=['PT', 'NRR'], ascending=[False, False]).reset_index(drop=True)
+    final.index += 1
 
-    st.markdown("### 📍 North Group")
-    st.dataframe(north_updated)
+    north_final = final[final['Team'].isin(north_group)].reset_index(drop=True)
+    south_final = final[~final['Team'].isin(north_group)].reset_index(drop=True)
+    north_final.index += 1
+    south_final.index += 1
 
-    st.markdown("### 📍 South Group")
-    st.dataframe(south_updated)
+    st.subheader("📍 North Group")
+    st.dataframe(north_final, use_container_width=True)
 
-st.markdown(
-    "<small>📘 Disclaimer: Always enter Overs For/Against as 20 if the concerned team has been bowled out earlier than their full quota of overs.</small>",
-    unsafe_allow_html=True)
+    st.subheader("📍 South Group")
+    st.dataframe(south_final, use_container_width=True)
+
+    st.markdown("ℹ️ **Disclaimer**: Always enter **Overs For/Against** as 20 if the concerned team has been bowled out earlier than their full quota of overs.")
