@@ -109,16 +109,11 @@ if st.button("Update Table"):
     }).reset_index().rename(columns={
         'Batting Team': 'Team', 'Team Runs': 'Runs For', 'NRR Balls': 'NRR Balls For'
     })
-    for_summary['Overs For'] = for_summary['NRR Balls For'].apply(balls_to_cricket_overs)
-    for_summary.drop(columns='NRR Balls For', inplace=True)
-
     against_summary = rows.groupby('Bowling Team').agg({
         'Team Runs': 'sum', 'NRR Balls': 'sum'
     }).reset_index().rename(columns={
         'Bowling Team': 'Team', 'Team Runs': 'Runs Against', 'NRR Balls': 'NRR Balls Against'
     })
-    against_summary['Overs Against'] = against_summary['NRR Balls Against'].apply(balls_to_cricket_overs)
-    against_summary.drop(columns='NRR Balls Against', inplace=True)
 
     summary = pd.merge(for_summary, against_summary, on='Team', how='outer')
 
@@ -128,9 +123,11 @@ if st.button("Update Table"):
     for match in future_matches:
         t1, t2 = match['team1'], match['team2']
         rf, of, ra, oa = match['runs_for'], match['overs_for'], match['runs_against'], match['overs_against']
+        b_for = cricket_overs_to_balls(of)
+        b_against = cricket_overs_to_balls(oa)
         add_rows += [
-            {'Team': t1, 'Runs For': rf, 'Overs For': of, 'Runs Against': ra, 'Overs Against': oa},
-            {'Team': t2, 'Runs For': ra, 'Overs For': oa, 'Runs Against': rf, 'Overs Against': of}
+            {'Team': t1, 'Runs For': rf, 'NRR Balls For': b_for, 'Runs Against': ra, 'NRR Balls Against': b_against},
+            {'Team': t2, 'Runs For': ra, 'NRR Balls For': b_against, 'Runs Against': rf, 'NRR Balls Against': b_for}
         ]
         if rf > ra:
             future_results += [{'Team': t1, 'W': 1, 'L': 0, 'T': 0, 'N/R': 0}, {'Team': t2, 'W': 0, 'L': 1, 'T': 0, 'N/R': 0}]
@@ -139,13 +136,13 @@ if st.button("Update Table"):
         else:
             future_results += [{'Team': t1, 'W': 0, 'L': 0, 'T': 1, 'N/R': 0}, {'Team': t2, 'W': 0, 'L': 0, 'T': 1, 'N/R': 0}]
 
-    add_df = pd.DataFrame(add_rows)
-    summary = pd.concat([summary, add_df]).groupby('Team').agg({
-        'Runs For': 'sum', 'Overs For': 'sum', 'Runs Against': 'sum', 'Overs Against': 'sum'
+    future_df = pd.DataFrame(add_rows)
+    summary = pd.concat([summary, future_df]).groupby('Team').agg({
+        'Runs For': 'sum', 'NRR Balls For': 'sum', 'Runs Against': 'sum', 'NRR Balls Against': 'sum'
     }).reset_index()
 
-    summary['NRR Balls For'] = summary['Overs For'].apply(cricket_overs_to_balls)
-    summary['NRR Balls Against'] = summary['Overs Against'].apply(cricket_overs_to_balls)
+    summary['Overs For'] = summary['NRR Balls For'].apply(balls_to_cricket_overs)
+    summary['Overs Against'] = summary['NRR Balls Against'].apply(balls_to_cricket_overs)
     summary['Run Rate For'] = summary['Runs For'] / (summary['NRR Balls For'] / 6)
     summary['Run Rate Against'] = summary['Runs Against'] / (summary['NRR Balls Against'] / 6)
     summary['NRR'] = (summary['Run Rate For'] - summary['Run Rate Against']).round(3)
@@ -176,6 +173,9 @@ if st.button("Update Table"):
         'Middlesex Women': 1, 'Yorkshire Women': 2, 'Derbyshire Falcons Women': 1
     }).fillna(0).astype(int)
     outcome['PT'] = outcome['W'] * 4 + outcome['T'] * 2 + outcome['N/R'] * 2 + outcome['BP']
+
+    outcome['Team'] = outcome['Team'].str.strip()
+    summary['Team'] = summary['Team'].str.strip()
 
     final = pd.merge(outcome, summary[['Team', 'NRR', 'Runs For', 'Overs For', 'Runs Against', 'Overs Against']], on='Team', how='outer')
     final = final[['Team', 'M', 'W', 'L', 'T', 'N/R', 'BP', 'PT', 'NRR', 'Runs For', 'Overs For', 'Runs Against', 'Overs Against']]
