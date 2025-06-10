@@ -38,15 +38,27 @@ st.markdown("Input results for **future games** below to get the updated standin
 num_matches = st.number_input("Number of future matches to add", min_value=1, value=1, step=1)
 
 future_matches = []
+overs_input_valid = True  # Global validation flag
 
 for i in range(num_matches):
     st.markdown(f"### Match {i+1}")
     team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
     team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
     runs_for = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs_for_{i}")
-    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, step=0.1, key=f"overs_for_{i}")
+    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}",
+                                min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
     runs_against = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs_against_{i}")
-    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, key=f"overs_against_{i}")
+    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}",
+                                    min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
+
+    # Validation: only accept overs ending in .0 to .5
+    def is_valid_overs(o): return (o * 10) % 1 == 0 and 0.0 <= (o % 1) <= 0.5
+    if not is_valid_overs(overs_for):
+        st.warning(f"⚠️ Match {i+1}: Overs For must end in .0 to .5 only.")
+        overs_input_valid = False
+    if not is_valid_overs(overs_against):
+        st.warning(f"⚠️ Match {i+1}: Overs Against must end in .0 to .5 only.")
+        overs_input_valid = False
 
     future_matches.append({
         'team1': team1, 'team2': team2,
@@ -55,6 +67,10 @@ for i in range(num_matches):
     })
 
 if st.button("Update Table"):
+    if not overs_input_valid:
+        st.error("❌ Please correct the invalid Overs inputs before proceeding.")
+        st.stop()
+
     df = load_base_data()
     df.columns = df.columns.str.strip()
     df[['Team1', 'Team2']] = df['Match'].str.split(' v ', expand=True)
@@ -90,7 +106,6 @@ if st.button("Update Table"):
 
     summary = pd.merge(for_summary, against_summary, on='Team', how='outer')
 
-    # Add all future matches
     add_rows = []
     future_results = []
 
