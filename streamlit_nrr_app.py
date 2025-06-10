@@ -1,19 +1,19 @@
 import streamlit as st
 import pandas as pd
 
-# ----------------------------------------
+# -----------------------------
 # Cached Data Loader
-# ----------------------------------------
+# -----------------------------
 @st.cache_data
 def load_base_data():
     return pd.read_csv("9JuneuptoWT20.csv")
 
-# ----------------------------------------
+# -----------------------------
 # Helper Functions
-# ----------------------------------------
+# -----------------------------
 def cricket_overs_to_balls(overs):
     overs_int = int(overs)
-    balls_part = int((overs - overs_int) * 10 + 1e-6)
+    balls_part = int((overs - overs_int) * 10 + 1e-6)  # Safe rounding
     return overs_int * 6 + balls_part
 
 def balls_to_cricket_overs(balls):
@@ -22,7 +22,7 @@ def balls_to_cricket_overs(balls):
     return float(f"{overs}.{rem_balls}")
 
 def corrected_actual_overs(row):
-    adjusted_ball = row['Actual Ball']
+    adjusted_ball = row['Ball']
     if row['Legal Ball'] != 'Yes':
         adjusted_ball = max(0, adjusted_ball - 1)
     if adjusted_ball == 6:
@@ -35,9 +35,9 @@ def is_valid_overs(o):
     dec_part = round((o - int_part) * 10)
     return 0 <= dec_part <= 5
 
-# ----------------------------------------
-# Setup
-# ----------------------------------------
+# -----------------------------
+# UI
+# -----------------------------
 st.title("Vitality Blast 2025 Standings Calculator")
 st.markdown("Input results for **future games** below to get the updated standings.")
 
@@ -54,9 +54,6 @@ north_group = [
     'Worcestershire Rapids Women'
 ]
 
-# ----------------------------------------
-# Input Future Matches
-# ----------------------------------------
 num_matches = st.number_input("Number of future matches to add", min_value=1, value=1, step=1)
 future_matches = []
 overs_input_valid = True
@@ -66,9 +63,9 @@ for i in range(num_matches):
     team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
     team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
     runs_for = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs_for_{i}")
-    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
+    overs_for = st.number_input(f"Overs For (e.g., 19.5)", min_value=0.0, step=0.1, format="%.1f", key=f"overs_for_{i}")
     runs_against = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs_against_{i}")
-    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
+    overs_against = st.number_input(f"Overs Against (e.g., 20.0)", min_value=0.0, step=0.1, format="%.1f", key=f"overs_against_{i}")
 
     if not is_valid_overs(overs_for):
         st.warning(f"⚠️ Match {i+1}: Overs For must end in .0 to .5 only.")
@@ -83,9 +80,9 @@ for i in range(num_matches):
         'runs_against': runs_against, 'overs_against': overs_against
     })
 
-# ----------------------------------------
-# Process and Calculate
-# ----------------------------------------
+# -----------------------------
+# Main Calculation
+# -----------------------------
 if st.button("Update Table"):
     if not overs_input_valid:
         st.error("❌ Please correct the invalid Overs inputs before proceeding.")
@@ -99,27 +96,25 @@ if st.button("Update Table"):
     mask = df['Innings'].ne(df['Next_Innings']) & (df.index < len(df))
     rows_before_change = df[mask].copy().reset_index(drop=True).drop(columns=['Next_Innings'])
 
-    rows_before_change['Actual Ball'] = rows_before_change['Ball']
     rows_before_change['Actual Overs'] = rows_before_change.apply(corrected_actual_overs, axis=1)
     rows_before_change['NRR Overs'] = rows_before_change.apply(lambda r: 20.0 if r['Team Wickets'] == 10 else r['Actual Overs'], axis=1)
     rows_before_change['NRR Balls'] = rows_before_change['NRR Overs'].apply(cricket_overs_to_balls)
 
+    # Team summaries
     for_summary = rows_before_change.groupby('Batting Team').agg({
         'Team Runs': 'sum', 'NRR Balls': 'sum'
-    }).reset_index().rename(columns={
-        'Batting Team': 'Team', 'Team Runs': 'Runs For', 'NRR Balls': 'NRR Balls For'
-    })
+    }).reset_index().rename(columns={'Batting Team': 'Team', 'Team Runs': 'Runs For', 'NRR Balls': 'NRR Balls For'})
+
     against_summary = rows_before_change.groupby('Bowling Team').agg({
         'Team Runs': 'sum', 'NRR Balls': 'sum'
-    }).reset_index().rename(columns={
-        'Bowling Team': 'Team', 'Team Runs': 'Runs Against', 'NRR Balls': 'NRR Balls Against'
-    })
+    }).reset_index().rename(columns={'Bowling Team': 'Team', 'Team Runs': 'Runs Against', 'NRR Balls': 'NRR Balls Against'})
 
     summary = pd.merge(for_summary, against_summary, on='Team', how='outer')
 
-    # Add future matches
+    # Future matches
     add_rows = []
     future_results = []
+
     for match in future_matches:
         t1, t2 = match['team1'], match['team2']
         rf, of, ra, oa = match['runs_for'], match['overs_for'], match['runs_against'], match['overs_against']
@@ -147,6 +142,7 @@ if st.button("Update Table"):
     summary['Run Rate Against'] = summary['Runs Against'] / (summary['NRR Balls Against'] / 6)
     summary['NRR'] = (summary['Run Rate For'] - summary['Run Rate Against']).round(3)
 
+    # Match outcomes
     match_results = []
     innings_grouped = rows_before_change.groupby(['Match', 'Date'])
     for (match, date), group in innings_grouped:
@@ -173,9 +169,6 @@ if st.button("Update Table"):
         'Middlesex Women': 1, 'Yorkshire Women': 2, 'Derbyshire Falcons Women': 1
     }).fillna(0).astype(int)
     outcome['PT'] = outcome['W'] * 4 + outcome['T'] * 2 + outcome['N/R'] * 2 + outcome['BP']
-
-    outcome['Team'] = outcome['Team'].str.strip()
-    summary['Team'] = summary['Team'].str.strip()
 
     final = pd.merge(outcome, summary[['Team', 'NRR', 'Runs For', 'Overs For', 'Runs Against', 'Overs Against']], on='Team', how='outer')
     final = final[['Team', 'M', 'W', 'L', 'T', 'N/R', 'BP', 'PT', 'NRR', 'Runs For', 'Overs For', 'Runs Against', 'Overs Against']]
