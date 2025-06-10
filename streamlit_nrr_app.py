@@ -148,3 +148,7 @@ if st.button("Update Table"):
 
     st.subheader("📍 South Group")
     st.dataframe(south_table, use_container_width=True)
+    st.subheader("📍 South Group")
+    st.dataframe(south_table, use_container_width=True)
+
+    st.markdown("ℹ️ **Disclaimer**: Always enter **Overs For/Against** as 20 if the concerned team has been bowled out earlier than their full quota of overs.")
