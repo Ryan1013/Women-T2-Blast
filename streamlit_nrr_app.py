@@ -5,7 +5,7 @@ import math
 # Load base table from the original CSV data
 @st.cache_data
 def load_base_data():
-    return pd.read_csv("C:/Users/rahul/Downloads/9JuneuptoWT20.csv")
+    return pd.read_csv("9JuneuptoWT20.csv")
 
 # Helper functions
 def cricket_overs_to_balls(overs):
