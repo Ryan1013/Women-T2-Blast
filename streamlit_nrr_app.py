@@ -13,13 +13,13 @@ def load_base_data():
 # ----------------------------------------
 def cricket_overs_to_balls(overs):
     overs_int = int(overs)
-    balls_part = int(round((overs - overs_int) * 10))
+    balls_part = int((overs - overs_int) * 10 + 1e-6)
     return overs_int * 6 + balls_part
 
 def balls_to_cricket_overs(balls):
     overs = balls // 6
     rem_balls = balls % 6
-    return float(f"{int(overs)}.{int(rem_balls)}")
+    return float(f"{overs}.{rem_balls}")
 
 def corrected_actual_overs(row):
     adjusted_ball = row['Actual Ball']
