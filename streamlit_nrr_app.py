@@ -97,19 +97,19 @@ if st.button("Update Table"):
     df.sort_values(by=['Match', 'Date', 'Innings'], inplace=True)
     df['Next_Innings'] = df.groupby(['Match', 'Date'])['Innings'].shift(-1)
     mask = df['Innings'].ne(df['Next_Innings']) & (df.index < len(df))
-    rows = df[mask].copy().reset_index(drop=True).drop(columns=['Next_Innings'])
+    rows_before_change = df[mask].copy().reset_index(drop=True).drop(columns=['Next_Innings'])
 
-    rows['Actual Ball'] = rows['Ball']
-    rows['Actual Overs'] = rows.apply(corrected_actual_overs, axis=1)
-    rows['NRR Overs'] = rows.apply(lambda r: 20.0 if r['Team Wickets'] == 10 else r['Actual Overs'], axis=1)
-    rows['NRR Balls'] = rows['NRR Overs'].apply(cricket_overs_to_balls)
+    rows_before_change['Actual Ball'] = rows_before_change['Ball']
+    rows_before_change['Actual Overs'] = rows_before_change.apply(corrected_actual_overs, axis=1)
+    rows_before_change['NRR Overs'] = rows_before_change.apply(lambda r: 20.0 if r['Team Wickets'] == 10 else r['Actual Overs'], axis=1)
+    rows_before_change['NRR Balls'] = rows_before_change['NRR Overs'].apply(cricket_overs_to_balls)
 
-    for_summary = rows.groupby('Batting Team').agg({
+    for_summary = rows_before_change.groupby('Batting Team').agg({
         'Team Runs': 'sum', 'NRR Balls': 'sum'
     }).reset_index().rename(columns={
         'Batting Team': 'Team', 'Team Runs': 'Runs For', 'NRR Balls': 'NRR Balls For'
     })
-    against_summary = rows.groupby('Bowling Team').agg({
+    against_summary = rows_before_change.groupby('Bowling Team').agg({
         'Team Runs': 'sum', 'NRR Balls': 'sum'
     }).reset_index().rename(columns={
         'Bowling Team': 'Team', 'Team Runs': 'Runs Against', 'NRR Balls': 'NRR Balls Against'
@@ -148,7 +148,7 @@ if st.button("Update Table"):
     summary['NRR'] = (summary['Run Rate For'] - summary['Run Rate Against']).round(3)
 
     match_results = []
-    innings_grouped = rows.groupby(['Match', 'Date'])
+    innings_grouped = rows_before_change.groupby(['Match', 'Date'])
     for (match, date), group in innings_grouped:
         if len(group) == 2:
             t1 = group.iloc[0]['Batting Team']
