@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import math
 
 # Load base table from the original CSV data
 @st.cache_data
@@ -18,7 +17,7 @@ def balls_to_cricket_overs(balls):
     rem_balls = balls % 6
     return float(f"{int(overs)}.{int(rem_balls)}")
 
-# Initialize team list
+# Team list
 team_list = [
     'Middlesex Women', 'Yorkshire Women', 'Northamptonshire Steelbacks Women',
     'Derbyshire Falcons Women', 'Glamorgan Women', 'Sussex Sharks Women',
@@ -26,6 +25,13 @@ team_list = [
     'Kent Women', 'Gloucestershire Women'
 ]
 
+north_group = [
+    'Yorkshire Women', 'Northamptonshire Steelbacks Women',
+    'Derbyshire Falcons Women', 'Leicestershire Foxes Women',
+    'Worcestershire Rapids Women'
+]
+
+# UI
 st.title("Vitality Blast 2025 Standings Calculator")
 st.markdown("Input results for a **future game** below to get the updated standings.")
 
@@ -46,16 +52,27 @@ if st.button("Update Table"):
     rows = df[mask].copy().reset_index(drop=True).drop(columns=['Next_Innings'])
 
     rows['Actual Ball'] = rows['Ball']
-    rows['Actual Overs'] = rows.apply(lambda row: float(f"{int(row['Over']) - 1}.{int(row['Actual Ball'])}") if row['Legal Ball'] != 'Yes' else float(f"{int(row['Over'])}.{int(row['Actual Ball'])}") if row['Actual Ball'] == 6 else float(f"{int(row['Over']) - 1}.{int(row['Actual Ball'])}"), axis=1)
+    rows['Actual Overs'] = rows.apply(
+        lambda row: float(f"{int(row['Over']) - 1}.{int(row['Actual Ball'])}") if row['Legal Ball'] != 'Yes'
+        else float(f"{int(row['Over'])}.{int(row['Actual Ball'])}") if row['Actual Ball'] == 6
+        else float(f"{int(row['Over']) - 1}.{int(row['Actual Ball'])}"), axis=1)
+
     rows['NRR Overs'] = rows.apply(lambda r: 20.0 if r['Team Wickets'] == 10 else r['Actual Overs'], axis=1)
     rows['NRR Balls'] = rows['NRR Overs'].apply(cricket_overs_to_balls)
 
-    # For and Against summaries
-    for_summary = rows.groupby('Batting Team').agg({'Team Runs': 'sum', 'NRR Balls': 'sum'}).reset_index().rename(columns={'Batting Team': 'Team', 'Team Runs': 'Runs For', 'NRR Balls': 'NRR Balls For'})
+    for_summary = rows.groupby('Batting Team').agg({
+        'Team Runs': 'sum', 'NRR Balls': 'sum'
+    }).reset_index().rename(columns={
+        'Batting Team': 'Team', 'Team Runs': 'Runs For', 'NRR Balls': 'NRR Balls For'
+    })
     for_summary['Overs For'] = for_summary['NRR Balls For'].apply(balls_to_cricket_overs)
     for_summary.drop(columns='NRR Balls For', inplace=True)
 
-    against_summary = rows.groupby('Bowling Team').agg({'Team Runs': 'sum', 'NRR Balls': 'sum'}).reset_index().rename(columns={'Bowling Team': 'Team', 'Team Runs': 'Runs Against', 'NRR Balls': 'NRR Balls Against'})
+    against_summary = rows.groupby('Bowling Team').agg({
+        'Team Runs': 'sum', 'NRR Balls': 'sum'
+    }).reset_index().rename(columns={
+        'Bowling Team': 'Team', 'Team Runs': 'Runs Against', 'NRR Balls': 'NRR Balls Against'
+    })
     against_summary['Overs Against'] = against_summary['NRR Balls Against'].apply(balls_to_cricket_overs)
     against_summary.drop(columns='NRR Balls Against', inplace=True)
 
@@ -69,7 +86,6 @@ if st.button("Update Table"):
         'Runs Against': [runs_against, runs_for],
         'Overs Against': [overs_against, overs_for]
     })
-
     summary = pd.concat([summary, add_df]).groupby('Team').agg({
         'Runs For': 'sum', 'Overs For': 'sum',
         'Runs Against': 'sum', 'Overs Against': 'sum'
@@ -81,7 +97,6 @@ if st.button("Update Table"):
     summary['Run Rate Against'] = summary['Runs Against'] / (summary['NRR Balls Against'] / 6)
     summary['NRR'] = (summary['Run Rate For'] - summary['Run Rate Against']).round(3)
 
-    # Win/Loss Summary from actual data
     match_results = []
     innings_grouped = rows.groupby(['Match', 'Date'])
     for (match, date), group in innings_grouped:
@@ -103,7 +118,7 @@ if st.button("Update Table"):
     match_df = pd.DataFrame(match_results)
     outcome = match_df.groupby('Team').sum().reset_index()
 
-    # Add outcome for new match
+    # Add future match result
     if runs_for > runs_against:
         new_result = pd.DataFrame({'Team': [team1, team2], 'W': [1, 0], 'L': [0, 1], 'T': [0, 0], 'N/R': [0, 0]})
     elif runs_for < runs_against:
@@ -112,7 +127,9 @@ if st.button("Update Table"):
         new_result = pd.DataFrame({'Team': [team1, team2], 'W': [0, 0], 'L': [0, 0], 'T': [1, 1], 'N/R': [0, 0]})
     outcome = pd.concat([outcome, new_result]).groupby('Team').sum().reset_index()
     outcome['M'] = outcome[['W', 'L', 'T', 'N/R']].sum(axis=1)
-    outcome['BP'] = outcome['Team'].map({'Middlesex Women': 1, 'Yorkshire Women': 2, 'Derbyshire Falcons Women': 1}).fillna(0).astype(int)
+    outcome['BP'] = outcome['Team'].map({
+        'Middlesex Women': 1, 'Yorkshire Women': 2, 'Derbyshire Falcons Women': 1
+    }).fillna(0).astype(int)
     outcome['PT'] = outcome['W'] * 4 + outcome['T'] * 2 + outcome['N/R'] * 2 + outcome['BP']
 
     final = pd.merge(outcome, summary[['Team', 'NRR', 'Runs For', 'Overs For', 'Runs Against', 'Overs Against']], on='Team', how='outer')
@@ -120,5 +137,14 @@ if st.button("Update Table"):
     final = final.sort_values(by=['PT', 'NRR'], ascending=[False, False]).reset_index(drop=True)
     final.index += 1
 
-    st.subheader("📊 Updated Standings Table")
-    st.dataframe(final, use_container_width=True)
+    # Split into North and South
+    north_table = final[final['Team'].isin(north_group)].reset_index(drop=True)
+    south_table = final[~final['Team'].isin(north_group)].reset_index(drop=True)
+    north_table.index += 1
+    south_table.index += 1
+
+    st.subheader("📍 North Group")
+    st.dataframe(north_table, use_container_width=True)
+
+    st.subheader("📍 South Group")
+    st.dataframe(south_table, use_container_width=True)
