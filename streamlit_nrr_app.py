@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 
@@ -86,6 +85,13 @@ if st.button("Update Table"):
             if win:
                 updated.at[idx, 'W'] += 1
                 updated.at[idx, 'PT'] += 4
+
+                rr_for = add_rf / (cricket_overs_to_balls(add_of) / 6)
+                rr_against = add_ra / (cricket_overs_to_balls(add_oa) / 6)
+                if rr_for >= 1.25 * rr_against:
+                    updated.at[idx, 'BP'] += 1
+                    updated.at[idx, 'PT'] += 1
+
             elif tie:
                 updated.at[idx, 'T'] += 1
                 updated.at[idx, 'PT'] += 2
