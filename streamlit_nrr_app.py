@@ -93,7 +93,7 @@ for i in range(num_matches):
             overs_int = int(overs_float)
             overs_decimal = round((overs_float - overs_int) * 6)
             overs_str = f"{overs_int}.{overs_decimal}"
-            chase_data.append((f"{target} runs or more", f"within {overs_str} overs"))
+            chase_data.append((f"{target} runs or more", f"by {overs_str} overs"))
 
         if chase_data:
             chase_df = pd.DataFrame(chase_data, columns=["Runs to Chase", "To Earn Bonus Point"])
