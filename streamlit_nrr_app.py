@@ -85,7 +85,7 @@ for i in range(num_matches):
         st.markdown(f"- 🏃 **{team2}** can earn a bonus point if they chase:")
 
         chase_data = []
-        for target in range(runs_for + 1, runs_for + 8):  # Only up to +7 runs
+        for target in range(runs_for + 1, runs_for + 8):  # up to +7 runs inclusive
             balls_needed = (target / rr_required) * 6
             if balls_needed > 120:
                 continue
@@ -93,7 +93,7 @@ for i in range(num_matches):
             overs_int = int(overs_float)
             overs_decimal = round((overs_float - overs_int) * 6)
             overs_str = f"{overs_int}.{overs_decimal}"
-            chase_data.append((f"{target} runs or more", f"by {overs_str} overs"))
+            chase_data.append((f"{target} runs", f"within {overs_str} overs"))
 
         if chase_data:
             chase_df = pd.DataFrame(chase_data, columns=["Runs to Chase", "To Earn Bonus Point"])
