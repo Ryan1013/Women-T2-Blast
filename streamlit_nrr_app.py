@@ -70,9 +70,8 @@ for i in range(num_matches):
     team1 = st.selectbox(f"Team 1 (Inns 1 Batting) - Match {i+1}", team_list, key=f"team1_{i}")
     team2 = st.selectbox(f"Team 2 (Inns 2 Chasing) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
     runs_for = st.number_input(f"Inns 1 Runs - Match {i+1}", min_value=0, key=f"runs_for_{i}")
-    overs_for = st.number_input(f"Inns 1 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
+    overs_for = st.number_input(f"Inns 1 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=20.0, format="%.1f", key=f"overs_for_{i}")
 
-    # Bonus Point Scenario Display
     if runs_for > 0 and overs_for > 0:
         balls_for = cricket_overs_to_balls(overs_for)
         rr1 = runs_for / (balls_for / 6)
@@ -80,12 +79,13 @@ for i in range(num_matches):
 
         st.info(f"🎯 **Bonus Point Scenarios for Match {i+1}:**")
         max_runs_to_concede = int(runs_for / 1.25)
-        st.markdown(f"- 🛡️ **{team1}** must restrict **{team2}** to ≤ `{max_runs_to_concede}` runs to earn a bonus point")
+        st.markdown(f"- 🛡️ **{team1}** can earn a bonus point by restricting **{team2}** to **{max_runs_to_concede} runs or fewer**.")
 
-        target_range = range(runs_for + 1, int(runs_for * 1.05) + 15)
+        # Chasing bonus point scenarios
+        st.markdown(f"- 🏃 **{team2}** can earn a bonus point if they chase:")
+
         chase_data = []
-
-        for target in target_range:
+        for target in range(runs_for + 1, runs_for + 8):  # Only up to +7 runs
             balls_needed = (target / rr_required) * 6
             if balls_needed > 120:
                 continue
@@ -93,20 +93,14 @@ for i in range(num_matches):
             overs_int = int(overs_float)
             overs_decimal = round((overs_float - overs_int) * 6)
             overs_str = f"{overs_int}.{overs_decimal}"
-            chase_data.append((target, overs_str))
+            chase_data.append((f"{target} runs or more", f"within {overs_str} overs"))
 
         if chase_data:
-            valid_targets = [row[0] for row in chase_data]
-            min_target = min(valid_targets)
-            max_target = max(valid_targets)
-            st.markdown(f"- 🏃 **{team2}** must chase between **{min_target}–{max_target}** runs "
-                        f"in ≤ respective overs shown below to earn a bonus point:")
-
-            chase_df = pd.DataFrame(chase_data, columns=["Target", "Max Overs to Earn BP"])
+            chase_df = pd.DataFrame(chase_data, columns=["Runs to Chase", "To Earn Bonus Point"])
             st.dataframe(chase_df, use_container_width=True)
 
     runs_against = st.number_input(f"Inns 2 Runs - Match {i+1}", min_value=0, key=f"runs_against_{i}")
-    overs_against = st.number_input(f"Inns 2 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
+    overs_against = st.number_input(f"Inns 2 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=20.0, format="%.1f", key=f"overs_against_{i}")
 
     def is_valid_overs(o): return (o * 10) % 1 == 0 and 0.0 <= (o % 1) <= 0.5
     if not is_valid_overs(overs_for):
@@ -155,7 +149,6 @@ if st.button("Update Table"):
                 if rr_for >= 1.25 * rr_against:
                     updated.at[idx, 'BP'] += 1
                     updated.at[idx, 'PT'] += 1
-
             elif tie:
                 updated.at[idx, 'T'] += 1
                 updated.at[idx, 'PT'] += 2
