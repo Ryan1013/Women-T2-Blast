@@ -78,19 +78,32 @@ for i in range(num_matches):
         rr1 = runs_for / (balls_for / 6)
         rr_required = 1.25 * rr1
 
-        # Chasing team condition
-        max_balls_to_chase = (runs_for / rr_required) * 6
-        max_overs_float = max_balls_to_chase / 6
-        max_overs_int = int(max_overs_float)
-        max_overs_decimal = round((max_overs_float - max_overs_int) * 6)
-        max_overs_str = f"{max_overs_int}.{max_overs_decimal}"
-
-        # Defending team condition
-        max_runs_to_concede = int(runs_for / 1.25)
-
         st.info(f"🎯 **Bonus Point Scenarios for Match {i+1}:**")
-        st.markdown(f"- 🏃 **{team2}** must chase {runs_for} in **≤ {max_overs_str} overs** to earn a bonus point")
-        st.markdown(f"- 🛡️ **{team1}** must restrict {team2} to **< {max_runs_to_concede} runs** to earn a bonus point")
+        max_runs_to_concede = int(runs_for / 1.25)
+        st.markdown(f"- 🛡️ **{team1}** must restrict **{team2}** to ≤ `{max_runs_to_concede}` runs to earn a bonus point")
+
+        target_range = range(runs_for + 1, int(runs_for * 1.05) + 15)
+        chase_data = []
+
+        for target in target_range:
+            balls_needed = (target / rr_required) * 6
+            if balls_needed > 120:
+                continue
+            overs_float = balls_needed / 6
+            overs_int = int(overs_float)
+            overs_decimal = round((overs_float - overs_int) * 6)
+            overs_str = f"{overs_int}.{overs_decimal}"
+            chase_data.append((target, overs_str))
+
+        if chase_data:
+            valid_targets = [row[0] for row in chase_data]
+            min_target = min(valid_targets)
+            max_target = max(valid_targets)
+            st.markdown(f"- 🏃 **{team2}** must chase between **{min_target}–{max_target}** runs "
+                        f"in ≤ respective overs shown below to earn a bonus point:")
+
+            chase_df = pd.DataFrame(chase_data, columns=["Target", "Max Overs to Earn BP"])
+            st.dataframe(chase_df, use_container_width=True)
 
     runs_against = st.number_input(f"Inns 2 Runs - Match {i+1}", min_value=0, key=f"runs_against_{i}")
     overs_against = st.number_input(f"Inns 2 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
