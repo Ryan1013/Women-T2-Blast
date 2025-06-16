@@ -9,6 +9,11 @@ def cricket_overs_to_balls(overs):
     balls_part = int(round((overs - overs_int) * 10))
     return overs_int * 6 + balls_part
 
+def balls_to_cricket_overs(balls):
+    overs_int = balls // 6
+    balls_part = balls % 6
+    return float(f"{overs_int}.{balls_part}")
+
 # -----------------------------
 # Load Preprocessed Base Tables
 # -----------------------------
@@ -50,7 +55,7 @@ south_table = current_display[~current_display['Team'].isin(north_group)].reset_
 north_table.index += 1
 south_table.index += 1
 
-st.markdown("### 🧭 North Group")
+st.markdown("### 🧣 North Group")
 st.dataframe(north_table, use_container_width=True)
 
 st.markdown("### 🌍 South Group")
@@ -79,21 +84,18 @@ for i in range(num_matches):
 
         st.info(f"🎯 **Bonus Point Scenarios for Match {i+1}:**")
         max_runs_to_concede = int(runs_for / 1.25)
-        st.markdown(f"- 🛡️ **{team1}** can earn a bonus point by restricting **{team2}** to **{max_runs_to_concede} runs or fewer**.")
+        st.markdown(f"- 🌾 **{team1}** can earn a bonus point by restricting **{team2}** to **{max_runs_to_concede} runs or fewer**.")
 
         # Chasing bonus point scenarios
         st.markdown(f"- 🏃 **{team2}** can earn a bonus point if they chase:")
 
         chase_data = []
-        for target in range(runs_for + 1, runs_for + 8):  # up to +7 runs inclusive
+        for target in range(runs_for + 1, runs_for + 8):  # Up to +7 runs
             balls_needed = (target / rr_required) * 6
             if balls_needed > 120:
                 continue
-            overs_float = balls_needed / 6
-            overs_int = int(overs_float)
-            overs_decimal = round((overs_float - overs_int) * 6)
-            overs_str = f"{overs_int}.{overs_decimal}"
-            chase_data.append((f"{target} runs", f"within {overs_str} overs"))
+            overs_display = balls_to_cricket_overs(int(balls_needed))
+            chase_data.append((f"{target} runs", f"within {overs_display} overs"))
 
         if chase_data:
             chase_df = pd.DataFrame(chase_data, columns=["Runs to Chase", "To Earn Bonus Point"])
