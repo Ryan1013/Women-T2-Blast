@@ -67,10 +67,31 @@ overs_input_valid = True
 
 for i in range(num_matches):
     st.markdown(f"#### Match {i+1}")
-    team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
-    team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
+    team1 = st.selectbox(f"Team 1 (Inns 1 Batting) - Match {i+1}", team_list, key=f"team1_{i}")
+    team2 = st.selectbox(f"Team 2 (Inns 2 Chasing) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
     runs_for = st.number_input(f"Inns 1 Runs - Match {i+1}", min_value=0, key=f"runs_for_{i}")
     overs_for = st.number_input(f"Inns 1 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
+
+    # Bonus Point Scenario Display
+    if runs_for > 0 and overs_for > 0:
+        balls_for = cricket_overs_to_balls(overs_for)
+        rr1 = runs_for / (balls_for / 6)
+        rr_required = 1.25 * rr1
+
+        # Chasing team condition
+        max_balls_to_chase = (runs_for / rr_required) * 6
+        max_overs_float = max_balls_to_chase / 6
+        max_overs_int = int(max_overs_float)
+        max_overs_decimal = round((max_overs_float - max_overs_int) * 6)
+        max_overs_str = f"{max_overs_int}.{max_overs_decimal}"
+
+        # Defending team condition
+        max_runs_to_concede = int(runs_for / 1.25)
+
+        st.info(f"🎯 **Bonus Point Scenarios for Match {i+1}:**")
+        st.markdown(f"- 🏃 **{team2}** must chase {runs_for} in **≤ {max_overs_str} overs** to earn a bonus point")
+        st.markdown(f"- 🛡️ **{team1}** must restrict {team2} to **< {max_runs_to_concede} runs** to earn a bonus point")
+
     runs_against = st.number_input(f"Inns 2 Runs - Match {i+1}", min_value=0, key=f"runs_against_{i}")
     overs_against = st.number_input(f"Inns 2 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
 
@@ -79,7 +100,7 @@ for i in range(num_matches):
         st.warning(f"⚠️ Match {i+1}: Inns 1 Overs must end in .0 to .5 only.")
         overs_input_valid = False
     if not is_valid_overs(overs_against):
-        st.warning(f"⚠️ Match {i+1}: Inns 2 Overs Against must end in .0 to .5 only.")
+        st.warning(f"⚠️ Match {i+1}: Inns 2 Overs must end in .0 to .5 only.")
         overs_input_valid = False
 
     future_matches.append({
@@ -88,6 +109,9 @@ for i in range(num_matches):
         'runs_against': runs_against, 'overs_against': overs_against
     })
 
+# -----------------------------
+# Update Table Based on Input
+# -----------------------------
 if st.button("Update Table"):
     if not overs_input_valid:
         st.error("❌ Please correct the invalid Overs inputs before proceeding.")
