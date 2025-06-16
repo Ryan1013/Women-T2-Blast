@@ -30,8 +30,35 @@ north_group = [
     'Worcestershire Rapids Women'
 ]
 
+# Display current table
 st.title("Vitality Blast 2025 Standings Calculator")
-st.markdown("Input results for **future games** below to get the updated standings.")
+st.subheader("📊 Current Standings")
+
+current = base_data.copy()
+current['NRR Balls For'] = current['Overs For'].apply(cricket_overs_to_balls)
+current['NRR Balls Against'] = current['Overs Against'].apply(cricket_overs_to_balls)
+current['Run Rate For'] = current['Runs For'] / (current['NRR Balls For'] / 6)
+current['Run Rate Against'] = current['Runs Against'] / (current['NRR Balls Against'] / 6)
+current['NRR'] = (current['Run Rate For'] - current['Run Rate Against']).round(3)
+current_display = current[['Team', 'M', 'W', 'L', 'T', 'N/R', 'BP', 'PT', 'NRR',
+                           'Runs For', 'Overs For', 'Runs Against', 'Overs Against']]
+current_display = current_display.sort_values(by=['PT', 'NRR'], ascending=[False, False]).reset_index(drop=True)
+current_display.index += 1
+
+north_table = current_display[current_display['Team'].isin(north_group)].reset_index(drop=True)
+south_table = current_display[~current_display['Team'].isin(north_group)].reset_index(drop=True)
+north_table.index += 1
+south_table.index += 1
+
+st.markdown("### 🧭 North Group")
+st.dataframe(north_table, use_container_width=True)
+
+st.markdown("### 🌍 South Group")
+st.dataframe(south_table, use_container_width=True)
+
+# Input for future matches
+st.markdown("---")
+st.markdown("### ➕ Add Future Match Results")
 
 num_matches = st.number_input("Number of future matches to add", min_value=1, value=1, step=1)
 
@@ -39,20 +66,20 @@ future_matches = []
 overs_input_valid = True
 
 for i in range(num_matches):
-    st.markdown(f"### Match {i+1}")
+    st.markdown(f"#### Match {i+1}")
     team1 = st.selectbox(f"Team 1 (For) - Match {i+1}", team_list, key=f"team1_{i}")
     team2 = st.selectbox(f"Team 2 (Against) - Match {i+1}", [t for t in team_list if t != team1], key=f"team2_{i}")
-    runs_for = st.number_input(f"Runs For - Match {i+1}", min_value=0, key=f"runs_for_{i}")
-    overs_for = st.number_input(f"Overs For (e.g., 19.5) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
-    runs_against = st.number_input(f"Runs Against - Match {i+1}", min_value=0, key=f"runs_against_{i}")
-    overs_against = st.number_input(f"Overs Against (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
+    runs_for = st.number_input(f"Inns 1 Runs - Match {i+1}", min_value=0, key=f"runs_for_{i}")
+    overs_for = st.number_input(f"Inns 1 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_for_{i}")
+    runs_against = st.number_input(f"Inns 2 Runs - Match {i+1}", min_value=0, key=f"runs_against_{i}")
+    overs_against = st.number_input(f"Inns 2 Overs (e.g., 20.0) - Match {i+1}", min_value=0.0, step=0.1, value=0.0, format="%.1f", key=f"overs_against_{i}")
 
     def is_valid_overs(o): return (o * 10) % 1 == 0 and 0.0 <= (o % 1) <= 0.5
     if not is_valid_overs(overs_for):
-        st.warning(f"⚠️ Match {i+1}: Overs For must end in .0 to .5 only.")
+        st.warning(f"⚠️ Match {i+1}: Inns 1 Overs must end in .0 to .5 only.")
         overs_input_valid = False
     if not is_valid_overs(overs_against):
-        st.warning(f"⚠️ Match {i+1}: Overs Against must end in .0 to .5 only.")
+        st.warning(f"⚠️ Match {i+1}: Inns 2 Overs Against must end in .0 to .5 only.")
         overs_input_valid = False
 
     future_matches.append({
@@ -114,10 +141,10 @@ if st.button("Update Table"):
     north_table.index += 1
     south_table.index += 1
 
-    st.subheader("📍 North Group")
+    st.subheader("📍 Updated North Group")
     st.dataframe(north_table, use_container_width=True)
 
-    st.subheader("📍 South Group")
+    st.subheader("📍 Updated South Group")
     st.dataframe(south_table, use_container_width=True)
 
-    st.markdown("ℹ️ **Disclaimer**: Always enter **Overs For/Against** as 20 if the concerned team has been bowled out earlier than their full quota of overs.")
+    st.markdown("ℹ️ **Disclaimer**: Always enter **Overs** as 20 if the concerned team has been bowled out earlier than their full quota of overs.")
