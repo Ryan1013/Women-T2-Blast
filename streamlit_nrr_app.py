@@ -95,7 +95,7 @@ for i in range(num_matches):
             if balls_needed > 120:
                 continue
             overs_display = balls_to_cricket_overs(int(balls_needed))
-            chase_data.append((f"{target} runs", f"within {overs_display} overs"))
+            chase_data.append((f"{target} runs", f"by {overs_display} overs"))
 
         if chase_data:
             chase_df = pd.DataFrame(chase_data, columns=["Runs to Chase", "To Earn Bonus Point"])
