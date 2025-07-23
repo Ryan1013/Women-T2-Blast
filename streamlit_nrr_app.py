@@ -90,7 +90,7 @@ for i in range(num_matches):
         st.markdown(f"- 🏃 **{team2}** can earn a bonus point if they chase:")
 
         chase_data = []
-        for target in range(runs_for + 1, runs_for + 8):  # Up to +7 runs
+        for target in range(runs_for + 1, runs_for + 7):  # Up to +6 runs
             balls_needed = (target / rr_required) * 6
             if balls_needed > 120:
                 continue
