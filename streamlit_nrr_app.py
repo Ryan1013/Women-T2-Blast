@@ -44,7 +44,7 @@ current['NRR Balls For'] = current['Overs For'].apply(cricket_overs_to_balls)
 current['NRR Balls Against'] = current['Overs Against'].apply(cricket_overs_to_balls)
 current['Run Rate For'] = current['Runs For'] / (current['NRR Balls For'] / 6)
 current['Run Rate Against'] = current['Runs Against'] / (current['NRR Balls Against'] / 6)
-current['NRR'] = (current['Run Rate For'] - current['Run Rate Against']).round(3)
+current['NRR'] = (current['Run Rate For'] - current['Run Rate Against']).round(2)
 current_display = current[['Team', 'M', 'W', 'L', 'T', 'N/R', 'BP', 'PT', 'NRR',
                            'Runs For', 'Overs For', 'Runs Against', 'Overs Against']]
 current_display = current_display.sort_values(by=['PT', 'NRR'], ascending=[False, False]).reset_index(drop=True)
